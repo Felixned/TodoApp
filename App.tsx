@@ -12,7 +12,10 @@ import Home from './screens/home/Home';
 import Profile from './screens/profile/Profile';
 import Notifications from './screens/notifications/Notifications';
 import TodoList from './screens/todoList/TodoList';
+import { LogBox } from 'react-native';
 
+
+LogBox.ignoreAllLogs();//Ignore all log notifications
 const Stack = createNativeStackNavigator();
 
 export default function App() {

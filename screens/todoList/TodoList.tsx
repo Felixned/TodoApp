@@ -13,11 +13,13 @@ import Share from '../../assets/icons/share.svg';
 import Square from '../../assets/icons/square.svg';
 import CheckedSquare from '../../assets/icons/checked-square.svg';
 import VerticalDots from '../../assets/icons/dots-vertical.svg';
-import { addDoc, arrayRemove, collection, deleteDoc, doc, DocumentData, getDoc, getDocs, onSnapshot, query, QueryDocumentSnapshot, updateDoc, where } from 'firebase/firestore'
+import { addDoc, arrayRemove, collection, deleteDoc, doc, DocumentData, getDoc, getDocs, limit, onSnapshot, query, QueryDocumentSnapshot, updateDoc, where } from 'firebase/firestore'
 import { auth, firestore } from '../../firebase-config'
 import { resetNavigation } from '../../utils/ResetNavigation'
 import MyModal from '../../components/MyModal'
 import Loader from '../../components/Loader'
+import { getAuth } from 'firebase/auth'
+import moment from 'moment'
 
 interface TodoListProps {
     navigation: any,
@@ -51,13 +53,14 @@ export default function TodoList({ route, navigation }: TodoListProps) {
 
     async function deleteCurrentTodoList() {
         if (auth.currentUser) {
-            resetNavigation('Home', navigation)
+            const authCurrentUid = auth.currentUser.uid;
             await deleteDoc(doc(firestore, "lists", listId))
                 .then(() => {
-                    const listRef = doc(firestore, "users", listId);
-                    updateDoc(listRef, {
+                    const userRef = doc(firestore, "users", authCurrentUid);
+                    updateDoc(userRef, {
                         ownListsOrderId: arrayRemove(listId)
                     });
+
                 })
                 .catch((error) => alert(error))
         } else {
@@ -113,63 +116,88 @@ export default function TodoList({ route, navigation }: TodoListProps) {
     }
 
     function displayTodoListData() {
-        return dataList.map((todo: TodoProps, key) => {
-            return (
-                <View key={key} style={styles.todoLineStyle}>
-                    <Pressable><GripLines style={{ flex: 1 }} width={30} height={30} fill={primaryColor} /></Pressable>
-                    {todo.isChecked
-                        ?
-                        <Pressable
-                            onPress={() => updateDataList({ isChecked: false, value: todo.value }, key)}
+        if (dataList) {
+            return dataList.map((todo: TodoProps, key) => {
+                return (
+                    <View key={key} style={styles.todoLineStyle}>
+                        <Pressable><GripLines style={{ flex: 1 }} width={30} height={30} fill={primaryColor} /></Pressable>
+                        {todo.isChecked
+                            ?
+                            <Pressable
+                                onPress={() => updateDataList({ isChecked: false, value: todo.value }, key)}
+                            >
+                                <CheckedSquare style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
+                            </Pressable>
+                            :
+                            <Pressable
+                                onPress={() => updateDataList({ isChecked: true, value: todo.value }, key)}
+                            >
+                                <Square style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
+                            </Pressable>
+                        }
+                        <TextInput
+                            numberOfLines={1}
+                            style={todo.isChecked ? styles.todoInputStyleChecked : styles.todoInputStyle}
+                            onChangeText={(text) => {
+                                updateDataList({ isChecked: todo.isChecked, value: text }, key)
+                            }}
                         >
-                            <CheckedSquare style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
-                        </Pressable>
-                        :
+                            {todo.value}
+                        </TextInput>
                         <Pressable
-                            onPress={() => updateDataList({ isChecked: true, value: todo.value }, key)}
+                            onPress={() => deleteKeyInDataList(key)}
                         >
-                            <Square style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
+                            <Cross style={{ flex: 1, marginLeft: 'auto', marginRight: 3 }} width={28} height={28} fill={tertiaryColor} />
                         </Pressable>
-                    }
-                    <TextInput
-                        numberOfLines={1}
-                        style={todo.isChecked ? styles.todoInputStyleChecked : styles.todoInputStyle}
-                        onChangeText={(text) => {
-                            updateDataList({ isChecked: todo.isChecked, value: text }, key)
-                        }}
-                    >
-                        {todo.value}
-                    </TextInput>
-                    <Pressable
-                        onPress={() => deleteKeyInDataList(key)}
-                    >
-                        <Cross style={{ flex: 1, marginLeft: 'auto', marginRight: 3 }} width={28} height={28} fill={tertiaryColor} />
-                    </Pressable>
-                </View >
-            )
-        })
+                    </View >
+                )
+            })
+        }
     }
 
     function shareList() {
-        if (auth.currentUser) {
-            const currentUserUid = auth.currentUser.uid;
-            addDoc(collection(firestore, "shareNotifications"), {
-                isAccepted: false,
-                isPending: false,
-                receivingUid: 'test',
-                sendingUid: currentUserUid,
-                sendingDate: new Date().toLocaleString(),
-                responseDate: '',
-                viewedByReceiver: false,
-                viewedBySender: false,
-            })
-                .then(() => {
-                    setEmailToShareWith('');
-                    setIsShareModalVisible(false);
-                })
-                .catch((error: any) => alert(error))
+        if (auth.currentUser?.email?.toLowerCase() == emailToShareWith.toLowerCase()) {
+            alert('Vous ne pouvez pas partager avec vous-même');
         }
+        else {
+            const queryFindUserToShareWith = query(collection(firestore, "users"), where("email", "==", emailToShareWith), limit(1));
+            getDocs(queryFindUserToShareWith)
+                .then((querySnapshot) => {
+                    if (!querySnapshot.empty) {
+                        querySnapshot.forEach(async (doc) => {
+                            if (auth.currentUser) {
+                                const userToShareWithUid = doc.data().userUid;
+                                const currentUserUid = auth.currentUser.uid;
+                                const today = moment(new Date, 'DD-MM-YYYY').toString();
+                                await addDoc(collection(firestore, "shareNotifications"), {
+                                    isAccepted: false,
+                                    isPending: true,
+                                    receivingUid: userToShareWithUid,
+                                    sendingUid: currentUserUid,
+                                    listUid: listId,
+                                    sendingDate: today,
+                                    responseDate: '',
+                                    viewedByReceiver: false,
+                                    responseViewedBySender: false,
+                                })
+                                    .catch((error: any) => {
+                                        alert(error)
+                                    })
+                                    .finally(() => {
+                                        setEmailToShareWith('');
+                                        setIsShareModalVisible(false);
+                                    })
+                            }
+                            else {
+                                alert('Erreur avec auth currentUser');
+                            }
+                        });
+                    } else {
+                        alert('Impossible de trouver l\'utilisateur');
+                    }
+                })
 
+        }
     }
 
     useEffect(() => {
@@ -208,7 +236,7 @@ export default function TodoList({ route, navigation }: TodoListProps) {
                 >
                     <Pressable
                         style={AppStyles.smallSpacingLeftAndRight}
-                        onPress={() => deleteCurrentTodoList()}
+                        onPress={() => deleteCurrentTodoList().finally(() => resetNavigation('Home', navigation))}
                     >
                         <Trash width={30} height={30} fill={primaryColor} />
                     </Pressable>

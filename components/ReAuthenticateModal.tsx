@@ -27,7 +27,6 @@ export default function ReAuthenticateModal({ isModalVisible, setIsModalVisible,
         }
     }
 
-
     return (
         <MyModal title='Identifiants de connection' isModalVisible={isModalVisible} setIsModalVisible={setIsModalVisible}>
             {children}

@@ -34,6 +34,7 @@ export default function RegistrationScreen({ navigation }: RegistrationScreenPro
               fullName: fullName,
               userUid: user.uid,
               ownListsOrderId: [],
+              email: email,
             });
           })
           .catch((error) => alert(error.message))

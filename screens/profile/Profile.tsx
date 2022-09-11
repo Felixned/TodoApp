@@ -9,7 +9,7 @@ import { auth, firestore } from '../../firebase-config'
 import MyModal from '../../components/MyModal'
 import ReAuthenticateModal from '../../components/ReAuthenticateModal'
 import { resetNavigation } from '../../utils/ResetNavigation'
-import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { arrayRemove, collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore'
 import { updateCurrentUser, updateEmail, updatePassword } from 'firebase/auth'
 import Loader from '../../components/Loader'
 
@@ -42,40 +42,111 @@ export default function Profile({ navigation }: ProfileProps) {
             .catch(error => alert(error.message))
     }
 
-    function handleDeleteAccount() {
-        auth.currentUser?.delete()
-            .then(() => {
-                resetNavigation('ReceptionScreen', navigation);
-            })
-            .catch(() => setIsConfirmDeleteAccountModalVisible(true))
+    function deleteFromAllListOwned(currentUid: string) {
+        const queryAllOwnedLists = query(collection(firestore, "lists"), where("ownersUid", "array-contains", currentUid));
+        getDocs(queryAllOwnedLists)
+            .then((docs) => {
+                docs.forEach((doc) => {
+                    const docRef = doc.ref;
+                    updateDoc(docRef, {
+                        ownersUid: arrayRemove(currentUid)
+                    });
+                });
+            });
     }
 
-    function handleConfirmDeleteAccountWithAuthentication() {
-        auth.currentUser?.delete()
-            .then(() => {
-                resetNavigation('ReceptionScreen', navigation);
-            })
-            .catch(error => alert(error))
+    function deleteAllOwnedNotifs(currentUid: string) {
+        const queryAllReceivedNotifs = query(collection(firestore, "shareNotifications"), where("receivingUid", "==", currentUid));
+        const queryAllSentNotifs = query(collection(firestore, "shareNotifications"), where("receivingUid", "==", currentUid));
+        getDocs(queryAllSentNotifs)
+            .then((docs) => {
+                docs.forEach((doc) => {
+                    const docRef = doc.ref;
+                    deleteDoc(docRef);
+                });
+            });
+        getDocs(queryAllReceivedNotifs)
+            .then((docs) => {
+                docs.forEach((doc) => {
+                    const docRef = doc.ref;
+                    deleteDoc(docRef);
+                });
+            });
+    }
+
+    function deleteListsOwnedByNobody() {
+        const queryAllSentNotifs = query(collection(firestore, "lists"), where("ownersUid", "==", []));
+        getDocs(queryAllSentNotifs)
+            .then((docs) => {
+                docs.forEach((doc) => {
+                    const docRef = doc.ref;
+                    deleteDoc(docRef);
+                });
+            });
+    }
+
+    function handleDeleteAccount() {
+        if (auth.currentUser) {
+            const currentUid = auth.currentUser.uid;
+            auth.currentUser?.delete()
+                .then(() => { //effacer toute trace de ce user
+                    deleteDoc(doc(firestore, "users", currentUid));
+                    deleteFromAllListOwned(currentUid);
+                    deleteAllOwnedNotifs(currentUid);
+                    deleteListsOwnedByNobody();
+                    resetNavigation('ReceptionScreen', navigation);
+                })
+                .catch((error) => {
+                    if (error.message == 'Firebase: Error (auth/requires-recent-login).') {
+                        console.log('need recent login');
+                        setIsConfirmDeleteAccountModalVisible(true);
+                    }
+                    else {
+                        alert(error)
+                    }
+                })
+        }
+
+    }
+
+    function handleConfirmDeleteAccountAfterReAuthentication() {
+        if (auth.currentUser) {
+            const currentUid = auth.currentUser.uid;
+            auth.currentUser?.delete()
+                .then(() => { //effacer toute trace de ce user
+                    deleteDoc(doc(firestore, "users", currentUid));
+                    deleteFromAllListOwned(currentUid);
+                    deleteAllOwnedNotifs(currentUid);
+                    resetNavigation('ReceptionScreen', navigation);
+                })
+                .catch(error => alert(error))
+        }
     }
 
     async function handleModifyProfileInfo() {
         if (auth.currentUser) {
+            const currentUserDoc = doc(firestore, "users", auth.currentUser.uid);
             if (newPassword.length !== 0) {
                 updatePassword(auth.currentUser, newPassword).then(() => {
-                    console.log('password updated')
+                    //console.log('password updated')
                 }).catch((error) => {
                     alert(error)
                 });
             }
             if (hasEmailBeenModified) {
-                updateEmail(auth.currentUser, "user@example.com").then(() => {
-                    console.log('email updated')
-                }).catch((error) => {
-                    alert(error)
-                });
+                updateEmail(auth.currentUser, email).then(() => {
+                    //console.log('email updated')
+                })
+                    .then(async () => {
+                        await updateDoc(currentUserDoc, {
+                            email: email
+                        });
+                    })
+                    .catch((error) => {
+                        alert(error)
+                    });
             }
             if (hasFullNameBeenModified) {
-                const currentUserDoc = doc(firestore, "users", auth.currentUser.uid);
                 await updateDoc(currentUserDoc, {
                     fullName: fullName
                 });
@@ -203,12 +274,18 @@ export default function Profile({ navigation }: ProfileProps) {
                                 </View>
                             </View>
                         </MyModal>
-                        <ReAuthenticateModal isModalVisible={isConfirmDeleteAccountModalVisible} setIsModalVisible={setIsConfirmDeleteAccountModalVisible} thenFunction={handleConfirmDeleteAccountWithAuthentication} textConfirm={true} />
+                        <ReAuthenticateModal
+                            isModalVisible={isConfirmDeleteAccountModalVisible}
+                            setIsModalVisible={setIsConfirmDeleteAccountModalVisible}
+                            thenFunction={handleConfirmDeleteAccountAfterReAuthentication}
+                            textConfirm={true}
+                        />
                         <ReAuthenticateModal
                             isModalVisible={isConfirmModifyAccountModalVisible}
                             setIsModalVisible={setIsConfirmModifyAccountModalVisible}
                             thenFunction={() => {
-                                handleModifyProfileInfo().finally(() => resetNavigation('Home', navigation));
+                                handleModifyProfileInfo()
+                                    .finally(() => resetNavigation('Home', navigation));
                             }}
                             textConfirm={true} />
                     </View>

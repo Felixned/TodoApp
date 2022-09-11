@@ -284,5 +284,7 @@ export default StyleSheet.create({
     fontSize: smallFontSize,
     color: white,
   },
-
+  relative: {
+    position: 'relative',
+  }
 });

@@ -20,6 +20,7 @@ import MyModal from '../../components/MyModal'
 import Loader from '../../components/Loader'
 import { getAuth } from 'firebase/auth'
 import moment from 'moment'
+import { deleteListsOwnedByNobody } from '../../utils/EraseListsOwnedByNobody'
 
 interface TodoListProps {
     navigation: any,
@@ -55,12 +56,14 @@ export default function TodoList({ route, navigation }: TodoListProps) {
         if (auth.currentUser) {
             const authCurrentUid = auth.currentUser.uid;
             await deleteDoc(doc(firestore, "lists", listId))
-                .then(() => {
+                .then(async () => {
                     const userRef = doc(firestore, "users", authCurrentUid);
-                    updateDoc(userRef, {
+                    await updateDoc(userRef, {
                         ownListsOrderId: arrayRemove(listId)
-                    });
-
+                    })
+                        .then(() => {
+                            deleteListsOwnedByNobody();
+                        })
                 })
                 .catch((error) => alert(error))
         } else {
@@ -70,7 +73,7 @@ export default function TodoList({ route, navigation }: TodoListProps) {
 
     async function retrieveAndSetOwnersDocFromOwnersUid() {
         const listArray: QueryDocumentSnapshot<DocumentData>[] = [];
-        if (ownersUid.length > 0) {
+        if (ownersUid && ownersUid.length > 0) {
             const queryGetUsersDoc = query(collection(firestore, "users"), where("userUid", "in", ownersUid));
             const querySnapshot = await getDocs(queryGetUsersDoc);
             querySnapshot.forEach((doc) => {

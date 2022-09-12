@@ -12,6 +12,7 @@ import { resetNavigation } from '../../utils/ResetNavigation'
 import { arrayRemove, collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore'
 import { updateCurrentUser, updateEmail, updatePassword } from 'firebase/auth'
 import Loader from '../../components/Loader'
+import { deleteListsOwnedByNobody } from '../../utils/EraseListsOwnedByNobody'
 
 interface ProfileProps {
     navigation: any;
@@ -66,17 +67,6 @@ export default function Profile({ navigation }: ProfileProps) {
                 });
             });
         getDocs(queryAllReceivedNotifs)
-            .then((docs) => {
-                docs.forEach((doc) => {
-                    const docRef = doc.ref;
-                    deleteDoc(docRef);
-                });
-            });
-    }
-
-    function deleteListsOwnedByNobody() {
-        const queryAllSentNotifs = query(collection(firestore, "lists"), where("ownersUid", "==", []));
-        getDocs(queryAllSentNotifs)
             .then((docs) => {
                 docs.forEach((doc) => {
                     const docRef = doc.ref;

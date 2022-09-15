@@ -20,7 +20,7 @@ const bigTitleFontSize = 27;
 
 export const tinySpacing = 5;
 export const smallerSpacing = 10;
-const smallSpacing = 15;
+export const smallSpacing = 15;
 export const mediumSpacing = 20;
 const bigSpacing = 30;
 export const largerSpacing = 40;

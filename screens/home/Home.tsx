@@ -72,14 +72,14 @@ export default function Home({ navigation }: HomeProps) {
   async function getReceivedNotifAndReturnIfSomeAreNew() {
     let hasNewNotifs = false;
     if (auth.currentUser) {
-      //console.log('gettingNotifs');
+      //console.log('gettingNotifs of user', auth.currentUser.uid);
       const queryReceivedNotifs = query(collection(firestore, "shareNotifications"), where("receivingUid", "==", auth.currentUser.uid));
       getDocs(queryReceivedNotifs)
         .then((docs) => {
           docs.forEach((doc) => {
             //console.log('is this notif viewed ? ', doc.data().viewedByReceiver);
             if (!doc.data().viewedByReceiver) {
-              console.log('nouvelle notif');
+              //console.log('nouvelle notif');
               hasNewNotifs = true;
             }
           });

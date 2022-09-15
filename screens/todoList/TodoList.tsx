@@ -171,7 +171,7 @@ export default function TodoList({ route, navigation }: TodoListProps) {
                             if (auth.currentUser) {
                                 const userToShareWithUid = doc.data().userUid;
                                 const currentUserUid = auth.currentUser.uid;
-                                const today = moment(new Date, 'DD-MM-YYYY').toString();
+                                const today = moment(new Date).format('DD-MM-YYYY').toString();
                                 await addDoc(collection(firestore, "shareNotifications"), {
                                     isAccepted: false,
                                     isPending: true,

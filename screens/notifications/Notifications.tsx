@@ -198,9 +198,10 @@ export default function Notifications({ navigation }: NotificationsProps) {
     }, [])
 
     useEffect(() => {
-        sortAllNotifs()
-        setIsLoading(false);
+        sortAllNotifs();
     }, [isGetAllNotifsFinish]);
+
+    useEffect(() => { setIsLoading(false); }, [allSortedbyDateNotifications])
 
     function displayNotifications() {
         return (

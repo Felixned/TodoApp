@@ -35,11 +35,19 @@ export default function OneNotification({ notif }: NotificationProps) {
                     setSenderName(doc.data()?.fullName);
                 })
         }
-        if (notifLocal.type == ('sent' || 'sentResponse')) {
+        if (notifLocal.type == 'sent') {
             const senderUserDocRef = doc(firestore, 'users', notifLocal.receivingUid);
             getDoc(senderUserDocRef)
                 .then((doc) => {
-                    //console.log('senderName')
+                    //console.log('receivingUid')
+                    setReceiverName(doc.data()?.fullName);
+                })
+        }
+        if (notifLocal.type == 'sentResponse') {
+            const senderUserDocRef = doc(firestore, 'users', notifLocal.receivingUid);
+            getDoc(senderUserDocRef)
+                .then((doc) => {
+                    //console.log('receivingUid')
                     setReceiverName(doc.data()?.fullName);
                 })
         }

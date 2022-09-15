@@ -61,8 +61,16 @@ export default function TodoList({ route, navigation }: TodoListProps) {
                     await updateDoc(userRef, {
                         ownListsOrderId: arrayRemove(listId)
                     })
-                        .then(() => {
+                        .then(async () => {
                             deleteListsOwnedByNobody();
+
+                            const queryNotification = query(collection(firestore, "shareNotifications"), where("listUid", "==", listId));
+                            const querysnap = await getDocs(queryNotification);
+                            querysnap.forEach(async (document) => {
+                                console.log('delete notif linked to the list')
+                                await deleteDoc(doc(firestore, "shareNotifications", document.id));
+                            })
+
                         })
                 })
                 .catch((error) => alert(error))

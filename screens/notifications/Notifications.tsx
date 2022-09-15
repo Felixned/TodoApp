@@ -151,14 +151,14 @@ export default function Notifications({ navigation }: NotificationsProps) {
 
         localAllNotifs.sort(
             (objA, objB) => {
-                return parseDateStringInMoment(objB.date).diff(parseDateStringInMoment(objA.date));
+                return parseDateStringInMoment(objB.date).diff(parseDateStringInMoment(objA.date)); // sort with date DD MM YYYY HH mm ss to have notifs in good order
             }
         )
 
         //console.log(localAllNotifs); // avec ça il faut réussir à les trier par date 
         const localallSortedbyDateNotifications: SortedByDateNotifications[] = []
         localAllNotifs.forEach((notif: LocaleSentNotificationAfterResponse | LocaleSentNotification | LocaleReceivedNotification) => {
-            const notifDate = notif.date
+            const notifDate = parseDateStringInMoment(notif.date, 'DD-MM-YYYY').format('DD-MM-YYYY').toString(); //format DD MM YYY to sort it by day
             if (localallSortedbyDateNotifications.some((element) => { return element.date === notifDate })) {
                 //console.log('date index found')
                 const indexObjectWithSameDate = localallSortedbyDateNotifications.findIndex((element) => { return element.date === notifDate })
@@ -166,7 +166,7 @@ export default function Notifications({ navigation }: NotificationsProps) {
             } else {
                 //console.log('date not found')
                 localallSortedbyDateNotifications.push({
-                    date: notif.date,
+                    date: notifDate,
                     notificationsOnThisDay: [notif],
                 })
             }

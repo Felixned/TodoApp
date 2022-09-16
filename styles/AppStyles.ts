@@ -154,7 +154,7 @@ export default StyleSheet.create({
     marginTop: largerSpacing,
   },
   topMediumSpace: {
-    marginTop: mediumSpacing,
+    paddingTop: mediumSpacing,
   },
   horizontalMediumSpace: {
     marginHorizontal: mediumSpacing,

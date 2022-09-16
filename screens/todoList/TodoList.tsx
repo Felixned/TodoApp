@@ -72,7 +72,6 @@ export default function TodoList({ route, navigation }: TodoListProps) {
                     })
                         .then(async () => {
                             deleteListsOwnedByNobody();
-
                             const queryNotification = query(collection(firestore, "shareNotifications"), where("listUid", "==", listId));
                             const querysnap = await getDocs(queryNotification);
                             querysnap.forEach(async (document) => {
@@ -318,7 +317,7 @@ export default function TodoList({ route, navigation }: TodoListProps) {
                 >
                     <Pressable
                         style={AppStyles.smallSpacingLeftAndRight}
-                        onPress={() => deleteCurrentTodoList().finally(() => resetNavigation('Home', navigation))}
+                        onPress={() => { resetNavigation('Home', navigation); deleteCurrentTodoList() }}
                     >
                         <Trash width={30} height={30} fill={primaryColor} />
                     </Pressable>

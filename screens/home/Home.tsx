@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import MyHeader from '../../components/MyHeader'
 import { StatusBar } from 'expo-status-bar'
-import AppStyles, { dangerColor, largeRadius, mainDarkBackgroundColor, mediumFontSize, mediumRadius, mediumSpacing, primaryColor, smallerSpacing, textFont, white } from '../../styles/AppStyles'
+import AppStyles, { dangerColor, largeRadius, mainDarkBackgroundColor, mediumFontSize, mediumRadius, mediumSpacing, primaryColor, smallerSpacing, smallSpacing, textFont, white } from '../../styles/AppStyles'
 import User from '../../assets/icons/user.svg';
 import Users from '../../assets/icons/users.svg';
 import Message from '../../assets/icons/message.svg';
@@ -13,6 +13,8 @@ import Exclamation from '../../assets/icons/circle-exclamation.svg';
 import { auth, firestore } from '../../firebase-config'
 import { addDoc, arrayUnion, collection, doc, DocumentData, getDoc, getDocs, query, QueryDocumentSnapshot, updateDoc, where } from 'firebase/firestore'
 import Loader from '../../components/Loader'
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 
 interface HomeProps {
   navigation: any,
@@ -101,7 +103,7 @@ export default function Home({ navigation }: HomeProps) {
     const localLists: QueryDocumentSnapshot<DocumentData>[] = [];
     const uidToAddToListsOrder: string[] = [];
 
-    console.log('list order :', listsOrder);
+    //console.log('list order :', listsOrder);
 
     //on met en premier les lists qui sont dans l'orderlist
     listsOrder.forEach((uid: string) => {
@@ -140,8 +142,6 @@ export default function Home({ navigation }: HomeProps) {
 
     setOrderedLists(localLists);
     setListsOrder(localListsOrder);
-    setIsLoading(false);
-
   }
 
   const displayOwnedLists = () => {
@@ -159,6 +159,20 @@ export default function Home({ navigation }: HomeProps) {
           </Pressable>
         )
       })
+    )
+  }
+
+  function renderList({ item, drag, isActive }: RenderItemParams<QueryDocumentSnapshot<DocumentData>>) {
+    return (
+      <Pressable
+        key={item.id}
+        style={styles.listContainerStyle}
+        onPress={() => navigateToTodoList(item.id)}
+      >
+        <Pressable onPressIn={drag} ><GripLines style={styles.gripeLinesStyle} width={30} height={30} fill={primaryColor} /></Pressable>
+        <Text numberOfLines={1} style={styles.listTitleStyle}>{item.data().listName}</Text>
+        {item.data().ownersUid?.length > 1 && <Users style={styles.usersLogoStyle} width={35} height={35} fill={primaryColor} />}
+      </Pressable>
     )
   }
 
@@ -186,17 +200,28 @@ export default function Home({ navigation }: HomeProps) {
     }
   }
 
+  function handleDragDrop(data: QueryDocumentSnapshot<DocumentData>[]) {
+    const localListsOrder: string[] = [];
+    data.forEach((list) => {
+      localListsOrder.push(list.id);
+    })
+
+    setListsOrder(localListsOrder);
+    setOrderedLists(data);
+  }
+
   useEffect(() => {
     sortListsAndCompleteOrderList();
   }, [lists])
 
   useEffect(() => {
     updateUserOwnListsOrderId();
+    setIsLoading(false);
   }, [OrderedLists])
 
   return (
     <SafeAreaProvider style={AppStyles.safeAreaStyle}>
-      <View style={AppStyles.fullScreenAppContainer}>
+      <GestureHandlerRootView style={AppStyles.fullScreenAppContainer}>
         <StatusBar style='light' backgroundColor='#000' />
         <MyHeader
           navigation={navigation}
@@ -226,15 +251,24 @@ export default function Home({ navigation }: HomeProps) {
               <Text style={[AppStyles.white, AppStyles.smallText, AppStyles.centeredText]}>Les listes que vous ajouterez seront visible dans cette section</Text>
             </View>
             :
-            <ScrollView contentContainerStyle={[AppStyles.botHugeMaring]} style={AppStyles.allScreenSpaceAvailableContainer}>
-              <View style={[AppStyles.smallPaddingCenteredContainer, AppStyles.topMediumSpace]}>
-                {displayOwnedLists()}
-              </View>
-            </ScrollView>
+            <View>
+              <DraggableFlatList
+                containerStyle={[AppStyles.fullHeightMinusHeaderContainer, styles.listsContainer]}
+                style={[AppStyles.topMediumSpace,]}
+                contentContainerStyle={[styles.hugeMargeBot,]}
+
+                data={OrderedLists}
+                onDragEnd={({ data }) => {
+                  handleDragDrop(data);
+                }}
+                keyExtractor={(item) => item.id}
+                renderItem={renderList}
+              />
+            </View>
         }
         <TouchableOpacity onPress={createNewList} style={styles.addListButtonStyle}><Plus height={40} width={40} fill={primaryColor} /></TouchableOpacity>
-      </View>
-    </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider >
   )
 }
 
@@ -278,5 +312,11 @@ const styles = StyleSheet.create({
     fontFamily: textFont,
     fontSize: mediumFontSize,
     flex: 1,
+  },
+  hugeMargeBot: {
+    paddingBottom: 180,
+  },
+  listsContainer: {
+    paddingHorizontal: smallSpacing,
   }
 })

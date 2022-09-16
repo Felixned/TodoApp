@@ -22,7 +22,7 @@ interface HomeProps {
 
 export default function Home({ navigation }: HomeProps) {
 
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [areThereNewNotifs, setAreThereNewNotifs] = useState<boolean>(false);
 
   const [listsOrder, setListsOrder] = useState<string[]>([]);
@@ -142,6 +142,7 @@ export default function Home({ navigation }: HomeProps) {
 
     setOrderedLists(localLists);
     setListsOrder(localListsOrder);
+    setIsLoading(false);
   }
 
   const displayOwnedLists = () => {
@@ -216,7 +217,6 @@ export default function Home({ navigation }: HomeProps) {
 
   useEffect(() => {
     updateUserOwnListsOrderId();
-    setIsLoading(false);
   }, [OrderedLists])
 
   return (

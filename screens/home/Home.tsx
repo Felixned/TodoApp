@@ -11,7 +11,7 @@ import Plus from '../../assets/icons/plus.svg';
 import GripLines from '../../assets/icons/grip-lines.svg';
 import Exclamation from '../../assets/icons/circle-exclamation.svg';
 import { auth, firestore } from '../../firebase-config'
-import { addDoc, arrayUnion, collection, doc, DocumentData, getDoc, getDocs, onSnapshot, query, QueryDocumentSnapshot, setDoc, updateDoc, where } from 'firebase/firestore'
+import { addDoc, arrayUnion, collection, doc, DocumentData, getDoc, getDocs, query, QueryDocumentSnapshot, updateDoc, where } from 'firebase/firestore'
 import Loader from '../../components/Loader'
 
 interface HomeProps {
@@ -23,8 +23,9 @@ export default function Home({ navigation }: HomeProps) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [areThereNewNotifs, setAreThereNewNotifs] = useState<boolean>(false);
 
+  const [listsOrder, setListsOrder] = useState<string[]>([]);
   const [lists, setLists] = useState<QueryDocumentSnapshot<DocumentData>[]>([]);
-  const [listsOrder, setListsOrder] = useState<[]>([]);
+  const [OrderedLists, setOrderedLists] = useState<QueryDocumentSnapshot<DocumentData>[]>([]);
 
   function createNewList() {
     if (auth.currentUser) {
@@ -54,14 +55,8 @@ export default function Home({ navigation }: HomeProps) {
   async function getUserOrderList() {
     if (auth.currentUser) {
       const userDocRef = doc(firestore, "users", auth.currentUser.uid);
-      return onSnapshot(
-        userDocRef,
-        { includeMetadataChanges: false },
-        (doc) => {
-          //console.log('ownListsOrderId :', doc.data()?.ownListsOrderId);
-          setListsOrder(doc.data()?.ownListsOrderId);
-        },
-        (error) => { alert(error) });
+      const docUser = await getDoc(userDocRef);
+      setListsOrder(docUser.data()?.ownListsOrderId);
     }
     else {
       alert('impossible de récupérer l\'utilisateur');
@@ -103,12 +98,55 @@ export default function Home({ navigation }: HomeProps) {
   }
 
   async function sortListsAndCompleteOrderList() {
+    const localLists: QueryDocumentSnapshot<DocumentData>[] = [];
+    const uidToAddToListsOrder: string[] = [];
+
+    console.log('list order :', listsOrder);
+
+    //on met en premier les lists qui sont dans l'orderlist
+    listsOrder.forEach((uid: string) => {
+      const found = lists.find((list: QueryDocumentSnapshot<DocumentData>) => {
+        //console.log('compare :', list.id, " and ", uid);
+        return uid == (list.id);
+      })
+      //console.log(found);
+      if (found) {
+        //console.log('trouvé dans orderList : ', found.id);
+        localLists.push(found);
+      }
+    })
+
+    //on ajoute les autres
+    lists.forEach((list: QueryDocumentSnapshot<DocumentData>) => {
+      const found = localLists.find((localList: QueryDocumentSnapshot<DocumentData>) => {
+        //console.log('compare :', list.id, " and ", localList.id);
+        return (localList.id) == (list.id);
+      })
+      if (found) {
+        //console.log('liste a ajouter :', list.id);
+
+      } else {
+        localLists.push(list);
+        uidToAddToListsOrder.push(list.id);
+      }
+    })
+
+    const localListsOrder: string[] = listsOrder;
+    uidToAddToListsOrder.forEach((uidToAdd) => {
+      //console.log('uid to add', uidToAdd);
+      localListsOrder.push(uidToAdd);
+    })
+    //console.log('uids to add', localListsOrder);
+
+    setOrderedLists(localLists);
+    setListsOrder(localListsOrder);
+    setIsLoading(false);
 
   }
 
   const displayOwnedLists = () => {
     return (
-      lists.map((list, key) => {
+      OrderedLists.map((list, key) => {
         return (
           <Pressable
             key={key}
@@ -125,16 +163,12 @@ export default function Home({ navigation }: HomeProps) {
   }
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
+    const unsubscribe = navigation.addListener('focus', async () => {
       setIsLoading(true);
       getReceivedNotifAndReturnIfSomeAreNew();
-      getUserOrderList()
-        .then(() => {
-          getAllOwnedLists()
-            .then(() => {
-              sortListsAndCompleteOrderList()
-                .then(() => setIsLoading(false))
-            })
+      await getUserOrderList()
+        .then(async () => {
+          await getAllOwnedLists()
         })
         .catch((error) => alert(error))
     });
@@ -145,6 +179,7 @@ export default function Home({ navigation }: HomeProps) {
   async function updateUserOwnListsOrderId() {
     if (auth.currentUser) {
       const userDocRef = doc(firestore, "users", auth.currentUser.uid);
+      //console.log('update lists order');
       await updateDoc(userDocRef, {
         ownListsOrderId: listsOrder
       });
@@ -152,8 +187,12 @@ export default function Home({ navigation }: HomeProps) {
   }
 
   useEffect(() => {
-    updateUserOwnListsOrderId()
-  }, [listsOrder]);
+    sortListsAndCompleteOrderList();
+  }, [lists])
+
+  useEffect(() => {
+    updateUserOwnListsOrderId();
+  }, [OrderedLists])
 
   return (
     <SafeAreaProvider style={AppStyles.safeAreaStyle}>
@@ -181,7 +220,7 @@ export default function Home({ navigation }: HomeProps) {
         </MyHeader>
         {isLoading
           ? <View style={AppStyles.allScreenSpaceAvailableContainer}><Loader size={'medium'}></Loader></View>
-          : lists.length == 0
+          : OrderedLists.length == 0
             ?
             <View style={AppStyles.allScreenSpaceAvailableCenteredContainer}>
               <Text style={[AppStyles.white, AppStyles.smallText, AppStyles.centeredText]}>Les listes que vous ajouterez seront visible dans cette section</Text>

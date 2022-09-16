@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import MyHeader from '../../components/MyHeader'
@@ -21,6 +21,8 @@ import Loader from '../../components/Loader'
 import { getAuth } from 'firebase/auth'
 import moment from 'moment'
 import { deleteListsOwnedByNobody } from '../../utils/EraseListsOwnedByNobody'
+import DraggableFlatList, { NestableDraggableFlatList, NestableScrollContainer, RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 
 interface TodoListProps {
     navigation: any,
@@ -32,12 +34,19 @@ interface TodoProps {
     value: string,
 }
 
+interface TodoPropsWithKey {
+    isChecked: boolean,
+    value: string,
+    localKey: string,
+}
+
 export default function TodoList({ route, navigation }: TodoListProps) {
 
     const listId = route.params.listId;
 
     const [title, setTitle] = useState<string>('');
     const [dataList, setDataList] = useState<TodoProps[]>([]);
+    const [dataListWithKey, setDataListWithKey] = useState<TodoPropsWithKey[]>([]);
     const [ownersUid, setOwnersUid] = useState<string[]>([]);
 
     const [ownersDoc, setOwnersDoc] = useState<QueryDocumentSnapshot<DocumentData>[]>();
@@ -126,44 +135,11 @@ export default function TodoList({ route, navigation }: TodoListProps) {
         });
     }
 
-    function displayTodoListData() {
-        if (dataList) {
-            return dataList.map((todo: TodoProps, key) => {
-                return (
-                    <View key={key} style={styles.todoLineStyle}>
-                        <Pressable><GripLines style={{ flex: 1 }} width={30} height={30} fill={primaryColor} /></Pressable>
-                        {todo.isChecked
-                            ?
-                            <Pressable
-                                onPress={() => updateDataList({ isChecked: false, value: todo.value }, key)}
-                            >
-                                <CheckedSquare style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
-                            </Pressable>
-                            :
-                            <Pressable
-                                onPress={() => updateDataList({ isChecked: true, value: todo.value }, key)}
-                            >
-                                <Square style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
-                            </Pressable>
-                        }
-                        <TextInput
-                            numberOfLines={1}
-                            style={todo.isChecked ? styles.todoInputStyleChecked : styles.todoInputStyle}
-                            onChangeText={(text) => {
-                                updateDataList({ isChecked: todo.isChecked, value: text }, key)
-                            }}
-                        >
-                            {todo.value}
-                        </TextInput>
-                        <Pressable
-                            onPress={() => deleteKeyInDataList(key)}
-                        >
-                            <Cross style={{ flex: 1, marginLeft: 'auto', marginRight: 3 }} width={28} height={28} fill={tertiaryColor} />
-                        </Pressable>
-                    </View >
-                )
-            })
-        }
+    async function updateDataListOrder(allData: any) {
+        const listRef = doc(firestore, "lists", listId);
+        await updateDoc(listRef, {
+            dataList: allData
+        });
     }
 
     function shareList() {
@@ -211,6 +187,89 @@ export default function TodoList({ route, navigation }: TodoListProps) {
         }
     }
 
+    const renderTodo = ({ item, drag, isActive }: RenderItemParams<TodoPropsWithKey>) => {
+        return (
+            <ScaleDecorator>
+                <View style={styles.todoLineStyle} >
+                    <Pressable onPressIn={() => {
+                        drag();
+                    }}
+                    >
+                        <GripLines style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
+                    </Pressable>
+                    {item.isChecked
+                        ?
+                        <Pressable
+                            onPress={() => updateDataList({ isChecked: false, value: item.value }, parseInt(item.localKey, 10))}
+                        >
+                            <CheckedSquare style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
+                        </Pressable>
+                        :
+                        <Pressable
+                            onPress={() => updateDataList({ isChecked: true, value: item.value }, parseInt(item.localKey, 10))}
+                        >
+                            <Square style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
+                        </Pressable>
+                    }
+                    <TextInput
+                        numberOfLines={1}
+                        style={item.isChecked ? styles.todoInputStyleChecked : styles.todoInputStyle}
+                        onChangeText={(text) => {
+                            updateDataList({ isChecked: item.isChecked, value: text }, parseInt(item.localKey, 10))
+                        }}
+                    >
+                        {item.value}
+                    </TextInput>
+                    <Pressable
+                        onPress={() => deleteKeyInDataList(parseInt(item.localKey, 10))}
+                    >
+                        <Cross style={{ flex: 1, marginLeft: 'auto', marginRight: 3 }} width={28} height={28} fill={tertiaryColor} />
+                    </Pressable>
+                </View >
+            </ScaleDecorator >
+        );
+    };
+
+    function displayTodoListData() {
+        if (dataList) {
+            return dataList.map((todo: TodoProps, key) => {
+                return (
+                    <View key={key} style={styles.todoLineStyle}>
+                        <Pressable><GripLines style={{ flex: 1 }} width={30} height={30} fill={primaryColor} /></Pressable>
+                        {todo.isChecked
+                            ?
+                            <Pressable
+                                onPress={() => updateDataList({ isChecked: false, value: todo.value }, key)}
+                            >
+                                <CheckedSquare style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
+                            </Pressable>
+                            :
+                            <Pressable
+                                onPress={() => updateDataList({ isChecked: true, value: todo.value }, key)}
+                            >
+                                <Square style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
+                            </Pressable>
+                        }
+                        <TextInput
+                            numberOfLines={1}
+                            style={todo.isChecked ? styles.todoInputStyleChecked : styles.todoInputStyle}
+                            onChangeText={(text) => {
+                                updateDataList({ isChecked: todo.isChecked, value: text }, key)
+                            }}
+                        >
+                            {todo.value}
+                        </TextInput>
+                        <Pressable
+                            onPress={() => deleteKeyInDataList(key)}
+                        >
+                            <Cross style={{ flex: 1, marginLeft: 'auto', marginRight: 3 }} width={28} height={28} fill={tertiaryColor} />
+                        </Pressable>
+                    </View >
+                )
+            })
+        }
+    }
+
     useEffect(() => {
         const docRef = doc(firestore, "lists", listId);
         const unsubscribe = onSnapshot(
@@ -237,9 +296,21 @@ export default function TodoList({ route, navigation }: TodoListProps) {
         retrieveAndSetOwnersDocFromOwnersUid();
     }, [ownersUid]);
 
+    useEffect(() => {
+        const localList: TodoPropsWithKey[] = [];
+        dataList.map((data: TodoProps, key: number) => {
+            localList.push({
+                value: data.value,
+                isChecked: data.isChecked,
+                localKey: key.toString(),
+            })
+        })
+        setDataListWithKey(localList)
+    }, [dataList])
+
     return (
         <SafeAreaProvider style={AppStyles.safeAreaStyle}>
-            <View style={AppStyles.fullScreenAppContainer}>
+            <GestureHandlerRootView style={AppStyles.fullScreenAppContainer}>
                 <StatusBar style='light' backgroundColor='#000' />
                 <MyHeader
                     navigation={navigation}
@@ -267,35 +338,41 @@ export default function TodoList({ route, navigation }: TodoListProps) {
                 {isLoading
                     ? <View style={AppStyles.allScreenSpaceAvailableContainer}><Loader size={'medium'}></Loader></View>
                     :
-                    <ScrollView style={AppStyles.allScreenSpaceAvailableContainer}>
-                        <View style={[AppStyles.smallPaddingCenteredContainer]}>
-                            <View style={[AppStyles.flexRowContainer, AppStyles.topMediumSpace]}>
-                                <TextInput
-                                    value={title}
-                                    numberOfLines={1}
-                                    onChangeText={text => {
-                                        setTitle(text);
-                                        updateTitle(text);
-                                    }}
-                                    style={[AppStyles.textInputStyleSmall, AppStyles.mediumText, styles.titleInputStyle]}
-                                />
-                                <Pressable><VerticalDots width={35} height={35} fill={white} /></Pressable>
-                            </View>
-                            <View style={styles.todoContainerStyle}>
-                                {displayTodoListData()}
-                            </View>
-                            <View style={styles.addNewTodoStyle}>
-                                <Pressable
-                                    style={styles.todoLineStyle}
-                                    onPress={() => newTodoInDataList()}
-                                >
-                                    <Pressable><GripLines style={{ flex: 1 }} width={30} height={30} /></Pressable>
-                                    <Plus style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
-                                    <Text style={[styles.todoInputStyle, AppStyles.primaryColor]}>Ajouter un élément</Text>
-                                </Pressable >
-                            </View>
+                    <View style={[AppStyles.smallPaddingCenteredContainer]}>
+                        <View style={[AppStyles.flexRowContainer, AppStyles.topMediumSpace]}>
+                            <TextInput
+                                value={title}
+                                numberOfLines={1}
+                                onChangeText={text => {
+                                    setTitle(text);
+                                    updateTitle(text);
+                                }}
+                                style={[AppStyles.textInputStyleSmall, AppStyles.mediumText, styles.titleInputStyle]}
+                            />
+                            <Pressable><VerticalDots width={35} height={35} fill={white} /></Pressable>
                         </View>
-                    </ScrollView>
+                        <View style={styles.todoContainerStyle}>
+                            <DraggableFlatList
+                                data={dataListWithKey}
+                                onDragEnd={({ data }) => {
+                                    setDataList(data);
+                                    updateDataListOrder(data);
+                                }}
+                                keyExtractor={(item) => item.localKey}
+                                renderItem={renderTodo}
+                            />
+                        </View>
+                        <View style={styles.addNewTodoStyle}>
+                            <Pressable
+                                style={styles.todoLineStyle}
+                                onPress={() => newTodoInDataList()}
+                            >
+                                <Pressable><GripLines style={{ flex: 1 }} width={30} height={30} /></Pressable>
+                                <Plus style={{ flex: 1 }} width={30} height={30} fill={primaryColor} />
+                                <Text style={[styles.todoInputStyle, AppStyles.primaryColor]}>Ajouter un élément</Text>
+                            </Pressable >
+                        </View>
+                    </View>
                 }
                 <MyModal
                     isModalVisible={isUsersModalVisible}
@@ -342,7 +419,7 @@ export default function TodoList({ route, navigation }: TodoListProps) {
                         </View>
                     </View>
                 </MyModal>
-            </View>
+            </GestureHandlerRootView>
         </SafeAreaProvider >
     )
 }
